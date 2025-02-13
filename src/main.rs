@@ -1,48 +1,53 @@
-use num::{Complex, Float};
-use num_complex::Complex32;
-use rustfft;
+use num_complex::Complex;
+use rustfft::{Fft, FftPlanner};
 
+pub struct Processor {
+    fft_len: usize,
+    fft_planner: FftPlanner<i16>,
+}
 enum alignment {
     left,
     right,
 }
-fn pad(signal: &mut Vec<Complex32>, pad_alignment: alignment, pad_value: Complex32) {
-    match pad_alignment {
-        alignment::left => signal.resize(signal.len() * 2, pad_value),
-        alignment::right => {
-            for i in 0..signal.len() {
-                signal.insert(0, pad_value);
+
+impl Processor {
+    fn create_fft_planner(&mut self) {
+        self.fft_planner = FftPlanner::new();
+    }
+
+    fn pad(
+        &self,
+        signal: &mut Vec<Complex<i16>>,
+        pad_alignment: alignment,
+        pad_value: Complex<i16>,
+    ) {
+        match pad_alignment {
+            alignment::left => signal.resize(signal.len() * 2, pad_value),
+            alignment::right => {
+                for i in 0..signal.len() {
+                    signal.insert(0, pad_value);
+                }
             }
         }
     }
-}
 
-fn cross_corr(signal_a: &mut Vec<Complex32>, signal_b: &mut Vec<Complex32>) -> Vec<f32> {
-    // signal_b.align_left;
-    pad(
-        signal_a,
-        alignment::left,
-        Complex {
-            re: (0.0),
-            im: (0.0),
-        },
-    );
+    fn cross_corr(&mut self, signal_a: &mut Vec<Complex<i16>>, signal_b: &mut Vec<Complex<i16>>) {
+        self.create_fft_planner();
+        let fft_fwd = self.fft_planner.plan_fft_forward(self.fft_len);
+        let fft_inv = self.fft_planner.plan_fft_inverse(self.fft_len * 2);
+        fft_fwd.process(signal_a);
+        fft_fwd.process(signal_b);
 
-    signal_b.reverse();
-    pad(
-        signal_b,
-        alignment::right,
-        Complex {
-            re: (0.0),
-            im: (0.0),
-        },
-    );
+        self.pad(signal_a, alignment::left, Complex { re: (0), im: (0) });
+        self.pad(signal_b, alignment::right, Complex { re: (0), im: (0) });
 
-    // 1. Set up FFT
-    // 2. Compute FFT of each signal
-    // 3. Conjugate multiplication of both FFTs
-    // 4. Inverse FFT
-    // 5. Integrate solution
+        let mut xcorr_coeffs: Vec<Complex<i16>> = Vec::new();
+        for i in 0..(self.fft_len * 2 - 1) {
+            xcorr_coeffs.push(signal_a[i] * (signal_b[i].conj()));
+        }
+
+        fft_inv.process(&mut xcorr_coeffs);
+    }
 }
 
 fn main() {}
