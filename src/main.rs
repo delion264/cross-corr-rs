@@ -35,11 +35,12 @@ impl Processor {
         self.create_fft_planner();
         let fft_fwd = self.fft_planner.plan_fft_forward(self.fft_len);
         let fft_inv = self.fft_planner.plan_fft_inverse(self.fft_len * 2);
-        fft_fwd.process(signal_a);
-        fft_fwd.process(signal_b);
 
         self.pad(signal_a, alignment::left, Complex { re: (0), im: (0) });
         self.pad(signal_b, alignment::right, Complex { re: (0), im: (0) });
+
+        fft_fwd.process(signal_a);
+        fft_fwd.process(signal_b);
 
         let mut xcorr_coeffs: Vec<Complex<i16>> = Vec::new();
         for i in 0..(self.fft_len * 2 - 1) {
